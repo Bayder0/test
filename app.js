@@ -325,11 +325,15 @@ async function processMark(imageData) {
 async function detectMark(imageData) {
     try {
         console.log('🤖 Detecting mark using AI...');
+        console.log('📸 Image data length:', imageData.length, 'characters');
         
         // ⚠️ IMPORTANT: REPLACE THIS URL WITH YOUR CLOUDFLARE WORKER URL!
         // Get it from: https://dash.cloudflare.com/workers
         // It looks like: https://mark-detector.YOUR-NAME.workers.dev
-        const WORKER_URL = 'https://mark-detector.baydershghl.workers.dev';
+        const WORKER_URL = 'https://mark-detector.YOUR-SUBDOMAIN.workers.dev';
+        
+        console.log('📡 Sending request to:', WORKER_URL);
+        console.log('⏰ Request sent at:', new Date().toLocaleTimeString());
         
         // Send image to Cloudflare Worker (which calls OpenAI)
         const response = await fetch(WORKER_URL, {
@@ -342,25 +346,53 @@ async function detectMark(imageData) {
             })
         });
         
+        console.log('📬 Response received at:', new Date().toLocaleTimeString());
+        console.log('📊 Response status:', response.status, response.statusText);
+        console.log('📊 Response headers:', [...response.headers.entries()]);
+        
         if (!response.ok) {
             const error = await response.json();
             console.error('❌ Worker error:', error);
+            console.error('❌ Full error object:', JSON.stringify(error, null, 2));
+            
+            // Show user-friendly error
+            alert(`❌ Worker Error:\nStatus: ${response.status}\nDetails: ${JSON.stringify(error, null, 2)}`);
             return null;
         }
         
         const result = await response.json();
-        console.log('📊 AI response:', result);
+        console.log('📊 AI response received:', result);
+        console.log('📊 AI response stringified:', JSON.stringify(result, null, 2));
+        console.log('🔍 Mark value:', result.mark);
+        console.log('🔍 Mark type:', typeof result.mark);
+        console.log('🔍 Confidence:', result.confidence);
+        console.log('🔍 Raw response:', result.raw_response);
         
         if (result.mark) {
             console.log(`✅ AI detected mark: ${result.mark}`);
             return result.mark.toString();
+        } else if (result.mark === null || result.mark === undefined) {
+            console.log('❌ AI could not detect mark (returned null/undefined)');
+            console.log('❌ Full response:', JSON.stringify(result));
+            
+            // Show helpful message
+            if (result.raw_response) {
+                console.log('⚠️ AI said:', result.raw_response);
+                alert(`⚠️ AI couldn't detect a valid mark.\nAI response: "${result.raw_response}"\n\nTry:\n- Clearer handwriting\n- Better lighting\n- Bigger numbers`);
+            }
+            return null;
         } else {
-            console.log('❌ AI could not detect mark');
+            console.log('⚠️ Unexpected response format:', result);
             return null;
         }
         
     } catch (err) {
         console.error('❌ AI detection error:', err);
+        console.error('❌ Error name:', err.name);
+        console.error('❌ Error message:', err.message);
+        console.error('❌ Error stack:', err.stack);
+        
+        alert(`❌ Error detecting mark:\n${err.message}\n\nCheck console (F12) for details.`);
         return null;
     }
 }
