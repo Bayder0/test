@@ -344,11 +344,18 @@ async function captureMark() {
     loading2.classList.add('show');
     captureBtn2.style.display = 'none';
 
-    canvas2.width = videoElement2.videoWidth;
-    canvas2.height = videoElement2.videoHeight;
+    // Capture at LOWER resolution to reduce file size
+    const maxWidth = 800;  // Reduced from full camera resolution
+    const scale = Math.min(1, maxWidth / videoElement2.videoWidth);
+    
+    canvas2.width = videoElement2.videoWidth * scale;
+    canvas2.height = videoElement2.videoHeight * scale;
     ctx2.drawImage(videoElement2, 0, 0, canvas2.width, canvas2.height);
 
-    const imageData = canvas2.toDataURL('image/png');
+    // Compress to JPEG with 70% quality instead of PNG
+    const imageData = canvas2.toDataURL('image/jpeg', 0.7);
+    
+    debugLog('📸 Compressed image size: ' + Math.round(imageData.length / 1024) + 'KB', 'info');
     
     await processMark(imageData);
 }
@@ -396,7 +403,7 @@ async function detectMark(imageData) {
         // ⚠️ IMPORTANT: REPLACE THIS URL WITH YOUR CLOUDFLARE WORKER URL!
         // Get it from: https://dash.cloudflare.com/workers
         // It looks like: https://mark-detector.YOUR-NAME.workers.dev
-        const WORKER_URL = 'https://mark-detector.baydershghl.workers.dev/';
+        const WORKER_URL = 'https://mark-detector.YOUR-SUBDOMAIN.workers.dev';
         
         debugLog('📡 Worker: ' + WORKER_URL.substring(0, 40) + '...', 'info');
         debugLog('⏰ Sending request...', 'info');
@@ -630,4 +637,3 @@ startCamera1();
 
 debugLog('✅ App initialized', 'success');
 debugLog('📱 Click 🐛 button to see debug info', 'info');
-
