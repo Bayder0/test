@@ -396,7 +396,7 @@ async function detectMark(imageData) {
         // ⚠️ IMPORTANT: REPLACE THIS URL WITH YOUR CLOUDFLARE WORKER URL!
         // Get it from: https://dash.cloudflare.com/workers
         // It looks like: https://mark-detector.YOUR-NAME.workers.dev
-        const WORKER_URL = 'https://mark-detector.YOUR-SUBDOMAIN.workers.dev';
+        const WORKER_URL = 'https://mark-detector.baydershghl.workers.dev/';
         
         debugLog('📡 Worker: ' + WORKER_URL.substring(0, 40) + '...', 'info');
         debugLog('⏰ Sending request...', 'info');
@@ -630,3 +630,4 @@ startCamera1();
 
 debugLog('✅ App initialized', 'success');
 debugLog('📱 Click 🐛 button to see debug info', 'info');
+
