@@ -39,6 +39,72 @@ const status = document.getElementById('status');
 const guideText = document.getElementById('guideText');
 
 // ============================================
+// DEBUG FUNCTIONS - Shows logs on screen for mobile
+// ============================================
+let debugLogs = [];
+const maxDebugLogs = 50;
+
+function debugLog(message, type = 'info') {
+    // Also log to console
+    console.log(message);
+    
+    // Add to debug box
+    const timestamp = new Date().toLocaleTimeString();
+    debugLogs.push({
+        time: timestamp,
+        message: message,
+        type: type
+    });
+    
+    // Keep only last 50 logs
+    if (debugLogs.length > maxDebugLogs) {
+        debugLogs.shift();
+    }
+    
+    updateDebugBox();
+}
+
+function updateDebugBox() {
+    const debugBox = document.getElementById('debugBox');
+    if (!debugBox) return;
+    
+    debugBox.innerHTML = debugLogs.map(log => {
+        let className = 'debug-line';
+        if (log.type === 'error') className += ' debug-error';
+        if (log.type === 'success') className += ' debug-success';
+        if (log.type === 'info') className += ' debug-info';
+        
+        return `<div class="${className}">[${log.time}] ${log.message}</div>`;
+    }).join('');
+    
+    // Auto scroll to bottom
+    debugBox.scrollTop = debugBox.scrollHeight;
+}
+
+function toggleDebug() {
+    const debugBox = document.getElementById('debugBox');
+    if (debugBox.classList.contains('show')) {
+        debugBox.classList.remove('show');
+    } else {
+        debugBox.classList.add('show');
+        updateDebugBox();
+    }
+}
+
+function clearDebug() {
+    debugLogs = [];
+    updateDebugBox();
+}
+
+// Auto-show debug on errors
+window.addEventListener('error', function(e) {
+    debugLog('❌ Error: ' + e.message, 'error');
+    document.getElementById('debugBox').classList.add('show');
+});
+
+debugLog('🚀 App started', 'success');
+
+// ============================================
 // CAMERA - PROPER START/STOP MANAGEMENT
 // ============================================
 async function startCamera1() {
@@ -324,16 +390,16 @@ async function processMark(imageData) {
  */
 async function detectMark(imageData) {
     try {
-        console.log('🤖 Detecting mark using AI...');
-        console.log('📸 Image data length:', imageData.length, 'characters');
+        debugLog('🤖 Detecting mark using AI...', 'info');
+        debugLog('📸 Image size: ' + Math.round(imageData.length / 1024) + 'KB', 'info');
         
         // ⚠️ IMPORTANT: REPLACE THIS URL WITH YOUR CLOUDFLARE WORKER URL!
         // Get it from: https://dash.cloudflare.com/workers
         // It looks like: https://mark-detector.YOUR-NAME.workers.dev
         const WORKER_URL = 'https://mark-detector.YOUR-SUBDOMAIN.workers.dev';
         
-        console.log('📡 Sending request to:', WORKER_URL);
-        console.log('⏰ Request sent at:', new Date().toLocaleTimeString());
+        debugLog('📡 Worker: ' + WORKER_URL.substring(0, 40) + '...', 'info');
+        debugLog('⏰ Sending request...', 'info');
         
         // Send image to Cloudflare Worker (which calls OpenAI)
         const response = await fetch(WORKER_URL, {
@@ -346,53 +412,58 @@ async function detectMark(imageData) {
             })
         });
         
-        console.log('📬 Response received at:', new Date().toLocaleTimeString());
-        console.log('📊 Response status:', response.status, response.statusText);
-        console.log('📊 Response headers:', [...response.headers.entries()]);
+        debugLog('📬 Response: ' + response.status + ' ' + response.statusText, 
+                 response.ok ? 'success' : 'error');
         
         if (!response.ok) {
             const error = await response.json();
-            console.error('❌ Worker error:', error);
-            console.error('❌ Full error object:', JSON.stringify(error, null, 2));
+            debugLog('❌ Error: ' + JSON.stringify(error), 'error');
             
             // Show user-friendly error
-            alert(`❌ Worker Error:\nStatus: ${response.status}\nDetails: ${JSON.stringify(error, null, 2)}`);
+            if (response.status === 401) {
+                alert('❌ API Key Error!\n\nYour OpenAI API key is invalid or not set correctly in Cloudflare Worker.\n\nSteps to fix:\n1. Go to Cloudflare Worker\n2. Settings → Variables\n3. Check OPENAI_API_KEY is encrypted\n4. Try adding it again');
+            } else {
+                alert('❌ Worker Error!\nStatus: ' + response.status + '\n\nCheck debug log (bug button) for details.');
+            }
+            
+            // Auto-show debug
+            document.getElementById('debugBox').classList.add('show');
             return null;
         }
         
         const result = await response.json();
-        console.log('📊 AI response received:', result);
-        console.log('📊 AI response stringified:', JSON.stringify(result, null, 2));
-        console.log('🔍 Mark value:', result.mark);
-        console.log('🔍 Mark type:', typeof result.mark);
-        console.log('🔍 Confidence:', result.confidence);
-        console.log('🔍 Raw response:', result.raw_response);
+        debugLog('📊 Response: ' + JSON.stringify(result), 'success');
+        debugLog('🔍 Mark: ' + result.mark, result.mark ? 'success' : 'error');
         
         if (result.mark) {
-            console.log(`✅ AI detected mark: ${result.mark}`);
+            debugLog(`✅ AI detected: ${result.mark}`, 'success');
             return result.mark.toString();
         } else if (result.mark === null || result.mark === undefined) {
-            console.log('❌ AI could not detect mark (returned null/undefined)');
-            console.log('❌ Full response:', JSON.stringify(result));
+            debugLog('❌ AI returned null/undefined', 'error');
             
-            // Show helpful message
             if (result.raw_response) {
-                console.log('⚠️ AI said:', result.raw_response);
-                alert(`⚠️ AI couldn't detect a valid mark.\nAI response: "${result.raw_response}"\n\nTry:\n- Clearer handwriting\n- Better lighting\n- Bigger numbers`);
+                debugLog('⚠️ AI said: ' + result.raw_response, 'error');
+                alert('⚠️ AI couldn\'t detect mark\n\nAI response: "' + result.raw_response + '"\n\nTry:\n• Clearer handwriting\n• Better lighting\n• Bigger numbers\n• Dark marker');
+            } else {
+                alert('⚠️ AI couldn\'t detect mark\n\nTry:\n• Write number BIGGER\n• Use BLACK marker\n• Good lighting\n• Fill the green frame');
             }
+            
+            // Auto-show debug
+            document.getElementById('debugBox').classList.add('show');
             return null;
         } else {
-            console.log('⚠️ Unexpected response format:', result);
+            debugLog('⚠️ Unexpected response format', 'error');
             return null;
         }
         
     } catch (err) {
-        console.error('❌ AI detection error:', err);
-        console.error('❌ Error name:', err.name);
-        console.error('❌ Error message:', err.message);
-        console.error('❌ Error stack:', err.stack);
+        debugLog('❌ Exception: ' + err.message, 'error');
+        debugLog('❌ Stack: ' + err.stack, 'error');
         
-        alert(`❌ Error detecting mark:\n${err.message}\n\nCheck console (F12) for details.`);
+        alert('❌ Error!\n\n' + err.message + '\n\nClick bug button (🐛) to see details.');
+        
+        // Auto-show debug
+        document.getElementById('debugBox').classList.add('show');
         return null;
     }
 }
@@ -547,13 +618,15 @@ exportBtn.addEventListener('click', exportToCSV);
 // ============================================
 // INIT
 // ============================================
-console.log('🚀 Starting app...');
+debugLog('🚀 Starting app...', 'info');
 
 if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+    debugLog('⚠️ Not HTTPS! Camera may not work', 'error');
     alert('⚠️ HTTPS REQUIRED! Camera needs HTTPS. Make sure URL starts with https://');
 }
 
 updateTable();
 startCamera1();
 
-console.log('✅ Camera should be starting now!');
+debugLog('✅ App initialized', 'success');
+debugLog('📱 Click 🐛 button to see debug info', 'info');
